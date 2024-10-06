@@ -1,14 +1,15 @@
+mod content;
+mod job;
+mod math;
+
 use std::time;
 
-use eframe::{
-    egui::{panel::Side, Button, CentralPanel, RichText, SidePanel, Ui, ViewportCommand, Widget},
-    epaint::Vec2,
-};
-
-mod blueprint;
-mod parts_list;
-mod wall_editor;
-mod welcome;
+use content::blueprint::BlueprintContent;
+use eframe::egui::{panel::Side, Button, RichText, SidePanel, ViewportCommand, Widget};
+use job::{Space, WallNode, WallSegment};
+use math::angle::Angle;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 
 fn main() {
     match eframe::run_native(
@@ -16,10 +17,10 @@ fn main() {
         eframe::NativeOptions {
             viewport: eframe::egui::ViewportBuilder {
                 title: Some("Computing Fun Closet CAD".to_owned()),
-                app_id: Some("org.computingfun.cf-closet-cad".to_owned()),
+                app_id: Some("Computing Fun Closet CAD".to_owned()),
                 position: None,
                 inner_size: None,
-                min_inner_size: Some(Vec2 { x: 500.0, y: 500.0 }),
+                min_inner_size: Some(eframe::epaint::Vec2 { x: 720.0, y: 480.0 }),
                 max_inner_size: None,
                 clamp_size_to_monitor_size: Some(true),
                 fullscreen: None,
@@ -60,7 +61,8 @@ fn main() {
         },
         Box::new(|_cc| {
             Ok(Box::new(MainApp {
-                content: welcome::update,
+                content: Box::new(BlueprintContent::default()),
+                space: Space::default(),
                 zoom: 2.5,
                 auto_save: time::Duration::from_secs(30),
             }))
@@ -79,26 +81,45 @@ fn main() {
 }
 
 struct MainApp {
-    content: fn(&mut MainApp, &mut Ui) -> (),
+    space: Space,
+    content: Box<dyn Content>,
     zoom: f32,
     auto_save: time::Duration,
 }
 
 impl eframe::App for MainApp {
-    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
+        let mut wall = WallSegment::default();
+        wall.nodes.push(WallNode {
+            angle: Angle::from_degrees(dec!(90)),
+            length: dec!(100),
+        });
+        wall.nodes.push(WallNode {
+            angle: Angle::from_degrees(Decimal::ZERO),
+            length: dec!(100),
+        });
+        wall.nodes.push(WallNode {
+            angle: Angle::from_degrees(dec!(-90)),
+            length: dec!(100),
+        });
+        wall.nodes.push(WallNode {
+            angle: Angle::from_degrees(dec!(125)),
+            length: dec!(100),
+        });
+        self.space.walls.push(wall);
+
         ctx.set_pixels_per_point(self.zoom);
 
-        // menu
         SidePanel::new(Side::Left, "menu").show(ctx, |ui| {
             ui.vertical_centered_justified(|ui| {
                 if Button::new(RichText::new("Blueprint")).ui(ui).clicked() {
-                    self.content = blueprint::update;
+                    //self.content = blueprint::update;
                 };
                 if Button::new(RichText::new("Wall Editor")).ui(ui).clicked() {
-                    self.content = wall_editor::update;
+                    //self.content = wall_editor::update;
                 };
                 if Button::new(RichText::new("Parts List")).ui(ui).clicked() {
-                    self.content = parts_list::update;
+                    //self.content = parts_list::update;
                 };
                 if Button::new(RichText::new("Fullscreen")).ui(ui).clicked() {
                     ctx.send_viewport_cmd(ViewportCommand::Fullscreen(
@@ -108,10 +129,7 @@ impl eframe::App for MainApp {
             });
         });
 
-        // content
-        CentralPanel::default().show(ctx, |ui| {
-            (self.content)(self, ui);
-        });
+        self.content.update(&mut self.space, ctx, frame)
     }
 
     fn auto_save_interval(&self) -> time::Duration {
@@ -121,4 +139,8 @@ impl eframe::App for MainApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
         println!("Saving");
     }
+}
+
+trait Content {
+    fn update(&mut self, job: &mut Space, ctx: &eframe::egui::Context, frame: &mut eframe::Frame);
 }

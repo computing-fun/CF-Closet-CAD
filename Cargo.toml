@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 eframe = "0.29.1"
+rust_decimal = { version = "1.36.0", features = ["maths"] }
+rust_decimal_macros = "1.36.0"
